@@ -1,0 +1,16 @@
+# cargo-audit configuration.
+#
+# RUSTSEC-2023-0071 ("Marvin Attack" timing sidechannel in `rsa` 0.9.10) is
+# reported against Cargo.lock because sqlx 0.8 lists its MySQL driver as an
+# optional dependency, so the lockfile resolves `sqlx-mysql` and its `rsa`
+# dependency even though this workspace enables only the Postgres driver.
+#
+# The crate is not in the build graph for any target:
+#
+#     cargo tree -i rsa --target all   # nothing to print
+#     cargo tree -i sqlx-mysql --target all
+#
+# There is no fixed `rsa` release, and no code path here performs RSA
+# operations. Re-check this entry whenever sqlx is upgraded.
+[advisories]
+ignore = ["RUSTSEC-2023-0071"]
