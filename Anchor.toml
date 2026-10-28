@@ -1,0 +1,18 @@
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+openwork_escrow = "GT6deu8TWzjUzu5grXg4zZiAxPosK7tyoykaLtVeLjR"
+
+[programs.devnet]
+openwork_escrow = "GT6deu8TWzjUzu5grXg4zZiAxPosK7tyoykaLtVeLjR"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test --manifest-path programs/openwork-escrow/Cargo.toml"
+
+[hooks]

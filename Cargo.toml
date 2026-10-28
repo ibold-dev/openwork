@@ -1,0 +1,29 @@
+[workspace]
+members = ["programs/*", "crates/*", "apps/api"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89.0"
+license = "MIT"
+repository = "https://github.com/openwork-labs/openwork"
+
+[workspace.dependencies]
+anyhow = "1.0.100"
+thiserror = "2.0.17"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+tracing = "0.1.41"
+
+openwork-domain = { path = "crates/domain" }
+openwork-aurora = { path = "crates/aurora-adapter" }
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
