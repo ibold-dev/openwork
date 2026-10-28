@@ -1,0 +1,1881 @@
+{
+  "address": "GT6deu8TWzjUzu5grXg4zZiAxPosK7tyoykaLtVeLjR",
+  "metadata": {
+    "name": "openwork_escrow",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "OpenWork milestone escrow program"
+  },
+  "docs": [
+    "OpenWork milestone escrow.",
+    "",
+    "Design rules:",
+    "- The program is the only authority over escrowed funds.",
+    "- Every milestone settles exactly once.",
+    "- No administrator can move funds. Disputes freeze release and are only",
+    "resolved by mutual cancellation signed by both parties.",
+    "- All amounts are `u64` base units; arithmetic uses checked operations."
+  ],
+  "instructions": [
+    {
+      "name": "accept_agreement",
+      "docs": [
+        "Freelancer accepts the committed terms. Requires the exact terms hash."
+      ],
+      "discriminator": [
+        69,
+        99,
+        1,
+        250,
+        152,
+        135,
+        196,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "freelancer",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "terms_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "approve_and_release",
+      "docs": [
+        "Client approves submitted work and the vault pays the freelancer."
+      ],
+      "discriminator": [
+        63,
+        254,
+        154,
+        45,
+        149,
+        32,
+        80,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "client",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          },
+          "relations": [
+            "milestone"
+          ]
+        },
+        {
+          "name": "milestone",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  108,
+                  101,
+                  115,
+                  116,
+                  111,
+                  110,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              },
+              {
+                "kind": "account",
+                "path": "milestone.index",
+                "account": "Milestone"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "freelancer_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.mint",
+                "account": "Agreement"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_draft_agreement",
+      "docs": [
+        "Client cancels a draft agreement that never held funds."
+      ],
+      "discriminator": [
+        237,
+        156,
+        180,
+        64,
+        158,
+        171,
+        111,
+        122
+      ],
+      "accounts": [
+        {
+          "name": "client",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_agreement",
+      "docs": [
+        "Create a draft agreement. Milestones are added afterwards, before acceptance."
+      ],
+      "discriminator": [
+        220,
+        156,
+        65,
+        172,
+        252,
+        68,
+        74,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "client",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "client"
+              },
+              {
+                "kind": "arg",
+                "path": "agreement_nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "agreement_nonce",
+          "type": "u64"
+        },
+        {
+          "name": "freelancer",
+          "type": "pubkey"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "terms_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_milestone",
+      "docs": [
+        "Add the next contiguous milestone while the agreement is still a draft."
+      ],
+      "discriminator": [
+        239,
+        58,
+        201,
+        28,
+        40,
+        186,
+        173,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "client",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "milestone",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  108,
+                  101,
+                  115,
+                  116,
+                  111,
+                  110,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              },
+              {
+                "kind": "arg",
+                "path": "index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u16"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "fund_milestone",
+      "docs": [
+        "Client funds one milestone from an SPL token account into the vault."
+      ],
+      "discriminator": [
+        104,
+        130,
+        72,
+        76,
+        84,
+        58,
+        37,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "client",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          },
+          "relations": [
+            "milestone"
+          ]
+        },
+        {
+          "name": "milestone",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  108,
+                  101,
+                  115,
+                  116,
+                  111,
+                  110,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              },
+              {
+                "kind": "account",
+                "path": "milestone.index",
+                "account": "Milestone"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "client_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "mutual_cancel_and_refund",
+      "docs": [
+        "Both parties authorize returning this milestone's funds to the client."
+      ],
+      "discriminator": [
+        0,
+        73,
+        127,
+        224,
+        181,
+        145,
+        75,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "client",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "freelancer",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          },
+          "relations": [
+            "milestone"
+          ]
+        },
+        {
+          "name": "milestone",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  108,
+                  101,
+                  115,
+                  116,
+                  111,
+                  110,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              },
+              {
+                "kind": "account",
+                "path": "milestone.index",
+                "account": "Milestone"
+              }
+            ]
+          }
+        },
+        {
+          "name": "client_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.mint",
+                "account": "Agreement"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "raise_dispute",
+      "docs": [
+        "Either party raises a dispute. Release is frozen until mutual cancellation."
+      ],
+      "discriminator": [
+        41,
+        243,
+        1,
+        51,
+        150,
+        95,
+        246,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "participant",
+          "signer": true
+        },
+        {
+          "name": "agreement",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          },
+          "relations": [
+            "milestone"
+          ]
+        },
+        {
+          "name": "milestone",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  108,
+                  101,
+                  115,
+                  116,
+                  111,
+                  110,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              },
+              {
+                "kind": "account",
+                "path": "milestone.index",
+                "account": "Milestone"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit_milestone",
+      "docs": [
+        "Freelancer submits a bounded deliverable hash."
+      ],
+      "discriminator": [
+        35,
+        96,
+        220,
+        215,
+        102,
+        83,
+        139,
+        52
+      ],
+      "accounts": [
+        {
+          "name": "freelancer",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.client",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.agreement_nonce",
+                "account": "Agreement"
+              }
+            ]
+          },
+          "relations": [
+            "milestone"
+          ]
+        },
+        {
+          "name": "milestone",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  108,
+                  101,
+                  115,
+                  116,
+                  111,
+                  110,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              },
+              {
+                "kind": "account",
+                "path": "milestone.index",
+                "account": "Milestone"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "deliverable_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Agreement",
+      "discriminator": [
+        83,
+        212,
+        5,
+        110,
+        225,
+        249,
+        197,
+        84
+      ]
+    },
+    {
+      "name": "Milestone",
+      "discriminator": [
+        38,
+        210,
+        239,
+        177,
+        85,
+        184,
+        10,
+        44
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AgreementAccepted",
+      "discriminator": [
+        179,
+        13,
+        67,
+        103,
+        171,
+        224,
+        35,
+        5
+      ]
+    },
+    {
+      "name": "AgreementCancelled",
+      "discriminator": [
+        132,
+        200,
+        190,
+        125,
+        242,
+        4,
+        12,
+        146
+      ]
+    },
+    {
+      "name": "AgreementCreated",
+      "discriminator": [
+        131,
+        148,
+        204,
+        18,
+        83,
+        92,
+        57,
+        18
+      ]
+    },
+    {
+      "name": "MilestoneCreated",
+      "discriminator": [
+        151,
+        154,
+        159,
+        254,
+        50,
+        174,
+        22,
+        209
+      ]
+    },
+    {
+      "name": "MilestoneDisputed",
+      "discriminator": [
+        83,
+        106,
+        229,
+        228,
+        159,
+        61,
+        122,
+        16
+      ]
+    },
+    {
+      "name": "MilestoneFunded",
+      "discriminator": [
+        133,
+        223,
+        85,
+        235,
+        56,
+        36,
+        238,
+        240
+      ]
+    },
+    {
+      "name": "MilestoneRefunded",
+      "discriminator": [
+        44,
+        160,
+        228,
+        6,
+        82,
+        43,
+        123,
+        85
+      ]
+    },
+    {
+      "name": "MilestoneReleased",
+      "discriminator": [
+        49,
+        225,
+        91,
+        223,
+        34,
+        165,
+        109,
+        181
+      ]
+    },
+    {
+      "name": "MilestoneSubmitted",
+      "discriminator": [
+        242,
+        19,
+        75,
+        99,
+        12,
+        28,
+        19,
+        33
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnauthorizedClient",
+      "msg": "Only the agreement client may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "UnauthorizedFreelancer",
+      "msg": "Only the agreement freelancer may perform this action"
+    },
+    {
+      "code": 6002,
+      "name": "UnauthorizedParticipant",
+      "msg": "Signer is not a participant of this agreement"
+    },
+    {
+      "code": 6003,
+      "name": "AgreementNotDraft",
+      "msg": "Agreement is not in draft state"
+    },
+    {
+      "code": 6004,
+      "name": "AgreementNotActive",
+      "msg": "Agreement is not active"
+    },
+    {
+      "code": 6005,
+      "name": "AgreementClosed",
+      "msg": "Agreement is already closed"
+    },
+    {
+      "code": 6006,
+      "name": "MilestoneNotPending",
+      "msg": "Milestone is not pending funding"
+    },
+    {
+      "code": 6007,
+      "name": "MilestoneNotFunded",
+      "msg": "Milestone has not been funded"
+    },
+    {
+      "code": 6008,
+      "name": "MilestoneNotSubmitted",
+      "msg": "Milestone work has not been submitted"
+    },
+    {
+      "code": 6009,
+      "name": "MilestoneSettled",
+      "msg": "Milestone is already settled"
+    },
+    {
+      "code": 6010,
+      "name": "MilestoneDisputed",
+      "msg": "Milestone is disputed and release is frozen"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidDisputeState",
+      "msg": "Milestone cannot be disputed in its current state"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidCounterparty",
+      "msg": "Client and freelancer must be distinct, non-default wallets"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidMint",
+      "msg": "Token mint is invalid for this agreement"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidVault",
+      "msg": "Vault token account does not match the agreement"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidAmount",
+      "msg": "Milestone amount must be greater than zero"
+    },
+    {
+      "code": 6016,
+      "name": "TooManyMilestones",
+      "msg": "Too many milestones for this agreement"
+    },
+    {
+      "code": 6017,
+      "name": "NonContiguousMilestone",
+      "msg": "Milestone index must be the next contiguous index"
+    },
+    {
+      "code": 6018,
+      "name": "TermsHashMismatch",
+      "msg": "Terms hash does not match the committed agreement terms"
+    },
+    {
+      "code": 6019,
+      "name": "NoMilestones",
+      "msg": "Agreement must have at least one milestone before acceptance"
+    },
+    {
+      "code": 6020,
+      "name": "FundingAmountMismatch",
+      "msg": "Funding amount did not match the milestone amount"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidDeliverableHash",
+      "msg": "Deliverable hash must not be empty"
+    },
+    {
+      "code": 6022,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "Agreement",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "AgreementState"
+              }
+            }
+          },
+          {
+            "name": "client",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "agreement_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "milestone_count",
+            "type": "u16"
+          },
+          {
+            "name": "settled_count",
+            "type": "u16"
+          },
+          {
+            "name": "refunded_count",
+            "type": "u16"
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "released_amount",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgreementAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgreementCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "client",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgreementCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "client",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "agreement_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgreementState",
+      "docs": [
+        "Lifecycle of an agreement.",
+        "",
+        "`Completed` means every milestone is settled (released or refunded).",
+        "`Cancelled` means every milestone was refunded after being funded, or the",
+        "agreement was cancelled while still a draft."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Draft"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Milestone",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MilestoneState"
+              }
+            }
+          },
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "deliverable_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "funded_at",
+            "type": "i64"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneDisputed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "raised_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneFunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "vault_balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneRefunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "client",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneReleased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneState",
+      "docs": [
+        "Lifecycle of a single milestone.",
+        "",
+        "Funds can only leave the vault through `Released` (client approval) or",
+        "`Refunded` (mutual cancellation). `Disputed` freezes both."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Funded"
+          },
+          {
+            "name": "Submitted"
+          },
+          {
+            "name": "Released"
+          },
+          {
+            "name": "Refunded"
+          },
+          {
+            "name": "Disputed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agreement",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "deliverable_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
