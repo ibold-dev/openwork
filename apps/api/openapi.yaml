@@ -1,0 +1,744 @@
+openapi: 3.0.3
+info:
+  title: OpenWork API
+  version: 0.1.0
+  description: |
+    Wallet-authenticated metadata and reconciliation API for OpenWork.
+
+    The API never signs a transaction, never custodies a key and never holds a
+    balance. It indexes off-chain terms, records the signatures users claim, and
+    reconciles them against Solana independently. The escrow program is the only
+    authority over funds.
+
+    Authentication is Sign-In-With-Solana: `POST /v1/auth/challenge` returns a
+    message, the wallet signs it, and `POST /v1/auth/verify` sets an HttpOnly
+    `openwork_session` cookie. Unsafe requests must also send the CSRF token from
+    `GET /v1/me` in `x-openwork-csrf` and an `Origin` header on the allowlist.
+  license:
+    name: MIT
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development
+tags:
+  - name: health
+  - name: auth
+  - name: contracts
+  - name: milestones
+  - name: settlements
+  - name: quotes
+
+paths:
+  /openapi.yaml:
+    get:
+      tags: [health]
+      summary: This document
+      security: []
+      responses:
+        '200':
+          description: The embedded OpenAPI contract.
+          content:
+            application/yaml:
+              schema: { type: string }
+  /health/live:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+  /health/ready:
+    get:
+      tags: [health]
+      summary: Readiness probe
+      description: Checks the database and the configured Solana RPC.
+      security: []
+      responses:
+        '200':
+          description: Dependencies are reachable.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '503':
+          description: A dependency is unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/auth/challenge:
+    post:
+      tags: [auth]
+      summary: Create a sign-in challenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address:
+                  type: string
+                  description: Base58 Solana public key.
+                cluster:
+                  type: string
+                  enum: [localnet, devnet, testnet, mainnet-beta]
+                  description: Defaults to the deployment cluster.
+      responses:
+        '200':
+          description: The exact SIWS message to sign.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Challenge' }
+        '400':
+          description: The requested cluster is not enabled on this deployment.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Invalid address or unsupported cluster.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/auth/verify:
+    post:
+      tags: [auth]
+      summary: Verify the signature and start a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, signature]
+              properties:
+                challengeId: { type: string, format: uuid }
+                signature:
+                  type: string
+                  description: Base58-encoded 64-byte ed25519 signature.
+      responses:
+        '200':
+          description: Session cookie set; CSRF token returned.
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400':
+          description: Challenge consumed, expired or tampered with.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke the current session
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Session revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loggedOut: { type: boolean }
+  /v1/me:
+    get:
+      tags: [auth]
+      summary: Current user and CSRF token
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: The authenticated session.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Session'
+                  - type: object
+                    properties:
+                      cluster: { type: string }
+        '401':
+          description: No valid session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/contracts:
+    get:
+      tags: [contracts]
+      summary: List contracts the wallet is party to
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Contracts on the session cluster.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contracts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Contract' }
+    post:
+      tags: [contracts]
+      summary: Index a contract draft
+      description: |
+        The server derives the agreement and milestone PDAs and recomputes
+        `sha256(canonical terms)`. The returned `termsHashBytes` are exactly the
+        bytes the client commits on chain. When neither `agreementNonce` nor
+        `termsHash` is supplied, the server allocates a nonce, so the client must
+        create the agreement with the returned `agreementNonce`. When both are
+        supplied, the browser already created the agreement on chain: the server
+        keeps that nonce and verifies that `termsHash` equals the hash it
+        recomputes. Supplying only one of the two is a validation error.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateContractRequest' }
+      responses:
+        '201':
+          description: The indexed contract.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+        '409':
+          description: |
+            The agreement could not be indexed. `agreement_already_indexed` when
+            a client-supplied `agreementNonce` already has an agreement for this
+            wallet; `agreement_nonce_collision` when the server failed to
+            allocate a fresh nonce (retry).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: |
+            Validation failed, including a `termsHash` that does not match the
+            canonical terms, or `agreementNonce`/`termsHash` supplied alone.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/contracts/{id}:
+    get:
+      tags: [contracts]
+      summary: Read one contract
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContractId'
+      responses:
+        '200':
+          description: The contract and its milestones.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+        '403':
+          description: The wallet is not a party.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Unknown contract.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/contracts/{id}/milestones:
+    post:
+      tags: [contracts]
+      summary: Append a milestone to a draft
+      description: Only the client may append, and only while the contract is a draft.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContractId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, amount]
+              properties:
+                index: { type: integer, minimum: 0, maximum: 11 }
+                title: { type: string, maxLength: 200 }
+                description: { type: string, maxLength: 2000 }
+                amount:
+                  type: string
+                  description: Integer base units as a decimal string.
+                  example: '1000000'
+      responses:
+        '201':
+          description: The updated contract.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+  /v1/contracts/{id}/accept-intent:
+    post:
+      tags: [contracts]
+      summary: Record that the freelancer accepted the terms
+      description: |
+        Off-chain bookkeeping only. The on-chain `accept_agreement` instruction
+        is what actually locks the terms, and reconciliation overwrites this
+        state when the transaction lands.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContractId'
+      responses:
+        '200':
+          description: The updated contract.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+
+  /v1/milestones/{id}/submit:
+    post:
+      tags: [milestones]
+      summary: Record a deliverable claim
+      description: |
+        Stores the URI and note and the canonical deliverable hash. The on-chain
+        `submit_milestone` instruction is the authoritative record.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uri]
+              properties:
+                uri: { type: string, maxLength: 512 }
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: The updated milestone.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Milestone' }
+  /v1/milestones/{id}/transactions:
+    get:
+      tags: [milestones]
+      summary: Signatures observed for a milestone
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Party-scoped settlement records.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Settlement' }
+
+  /v1/settlements:
+    post:
+      tags: [settlements]
+      summary: Claim an on-chain signature
+      description: |
+        The API records the claim and verifies it in the background against the
+        chain. A recorded signature is never treated as a settled payment by
+        itself: `verificationStatus` starts as `unverified` and only the worker
+        can move it to `verified` or `failed`.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contractId, signature, kind]
+              properties:
+                contractId: { type: string, format: uuid }
+                milestoneIndex:
+                  type: integer
+                  minimum: 0
+                  description: Required for milestone kinds.
+                signature:
+                  type: string
+                  description: Base58 transaction signature.
+                kind:
+                  type: string
+                  enum:
+                    - create_agreement
+                    - create_milestone
+                    - accept_agreement
+                    - cancel_draft_agreement
+                    - fund_milestone
+                    - submit_milestone
+                    - approve_and_release
+                    - raise_dispute
+                    - mutual_cancel_and_refund
+      responses:
+        '201':
+          description: The newly recorded claim.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementResponse' }
+        '200':
+          description: |
+            The signature was already recorded for this contract and kind (without
+            an `Idempotency-Key`), or the key replayed the original response.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementResponse' }
+        '403':
+          description: The wallet is not the expected signer for this kind.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: The contract or milestone index does not exist.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The `Idempotency-Key` was reused with a different payload.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Unknown kind, bad signature or missing milestone index.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/quotes:
+    post:
+      tags: [quotes]
+      summary: Request a funding quote
+      description: |
+        On this Devnet deployment the quote comes from a deterministic mock
+        adapter and is always flagged `simulated: true`. No bridge is involved.
+        The recipient must be the authenticated wallet: OpenWork never routes
+        funds to a third party.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuoteCreateRequest' }
+      responses:
+        '201':
+          description: The stored quote.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '422':
+          description: Invalid amount, asset or recipient.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: The requested routing mode is not enabled on this deployment.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/quotes/{id}:
+    get:
+      tags: [quotes]
+      summary: Read a quote and its status
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current stored status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '404':
+          description: Unknown quote.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: openwork_session
+      description: |
+        Session cookie set by `POST /v1/auth/verify`. State-changing requests
+        must also send `Origin` on the allowlist and the `x-openwork-csrf`
+        header returned by `/v1/me`.
+  parameters:
+    ContractId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, maxLength: 255 }
+      description: Replays the original response for the same key and request hash.
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: validation_error
+            message: { type: string }
+            requestId: { type: string }
+            details:
+              type: object
+              nullable: true
+              additionalProperties: true
+    Challenge:
+      type: object
+      required: [challengeId, message, nonce, expiresAt]
+      properties:
+        challengeId: { type: string, format: uuid }
+        message:
+          type: string
+          description: Exact UTF-8 bytes the wallet must sign.
+        nonce: { type: string }
+        expiresAt: { type: string, format: date-time }
+    User:
+      type: object
+      required: [id, wallet, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        wallet: { type: string }
+        createdAt: { type: string, format: date-time }
+    Session:
+      type: object
+      required: [user, csrfToken]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        csrfToken: { type: string }
+    MilestoneInput:
+      type: object
+      required: [title, amount]
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        amount:
+          type: string
+          description: Integer base units as a decimal string.
+    CreateContractRequest:
+      type: object
+      required: [freelancer, mint, title]
+      properties:
+        freelancer: { type: string }
+        mint: { type: string }
+        title: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        milestones:
+          type: array
+          maxItems: 12
+          items: { $ref: '#/components/schemas/MilestoneInput' }
+        agreementNonce:
+          type: string
+          pattern: '^[0-9]+$'
+          description: |
+            The `u64` agreement nonce as a decimal string, for browsers that
+            already created the agreement on chain. Must be supplied together
+            with `termsHash`. Omit both to have the server allocate a nonce.
+          example: '14429383793217412'
+        termsHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: |
+            Lowercase hex `sha256` of the canonical terms the client committed
+            on chain. Must be supplied together with `agreementNonce` and must
+            equal the hash the server recomputes.
+          example: '3f8d7b1c0e5a9642f0b8d31c7a4e659f2b0d81c43a7f9e5062bd4c1a8f73e2d9'
+    Milestone:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        contractId: { type: string, format: uuid }
+        chain: { type: string }
+        index: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        amount: { type: string }
+        state:
+          type: string
+          enum: [pending, funded, submitted, released, disputed, refunded]
+        chainState:
+          type: string
+          nullable: true
+        milestonePda: { type: string }
+        deliverableUri: { type: string, nullable: true }
+        deliverableNote: { type: string, nullable: true }
+        deliverableHash: { type: string, nullable: true }
+        fundedAt: { type: string, format: date-time, nullable: true }
+        submittedAt: { type: string, format: date-time, nullable: true }
+        settledAt: { type: string, format: date-time, nullable: true }
+        chainSyncedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Contract:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        chain: { type: string }
+        role:
+          type: string
+          enum: [client, freelancer]
+        client: { type: string }
+        freelancer: { type: string }
+        mint: { type: string }
+        title: { type: string }
+        description: { type: string }
+        termsHash: { type: string }
+        termsHashBytes:
+          type: array
+          description: The same hash as 32 byte values, so clients skip hex decoding.
+          items: { type: integer, minimum: 0, maximum: 255 }
+        agreementPda: { type: string }
+        agreementNonce: { type: string }
+        state: { type: string }
+        draftState: { type: string }
+        totalAmount: { type: string }
+        milestoneCount: { type: integer }
+        milestones:
+          type: array
+          items: { $ref: '#/components/schemas/Milestone' }
+        acceptedIntentAt: { type: string, format: date-time, nullable: true }
+        chainState: { type: string, nullable: true }
+        chainSettledCount: { type: integer, nullable: true }
+        chainRefundedCount: { type: integer, nullable: true }
+        chainReleasedAmount: { type: string, nullable: true }
+        chainSyncedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Settlement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        chain: { type: string }
+        signature: { type: string }
+        kind: { type: string }
+        contractId: { type: string, format: uuid }
+        milestoneId: { type: string, format: uuid, nullable: true }
+        milestoneIndex: { type: integer, nullable: true }
+        claimedBy: { type: string }
+        verificationStatus:
+          type: string
+          enum: [unverified, verified, failed, not_found]
+        slot: { type: integer, nullable: true }
+        blockTime: { type: string, format: date-time, nullable: true }
+        error:
+          type: object
+          nullable: true
+          description: Machine-readable reason when verification failed.
+          additionalProperties: true
+        checkedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    SettlementResponse:
+      type: object
+      required: [settlement, created]
+      properties:
+        settlement: { $ref: '#/components/schemas/Settlement' }
+        created:
+          type: boolean
+          description: False when the signature was already recorded.
+    QuoteCreateRequest:
+      type: object
+      required: [invoice, amount, originAsset, destinationAsset, recipient, refundTo]
+      properties:
+        mode:
+          type: string
+          enum: [mock, mainnet]
+          description: |
+            `mock` is a deterministic, simulated router. `mainnet` uses the NEAR
+            1Click API and is only available when the deployment enables it;
+            otherwise the request fails with `503 intents_unavailable`. The
+            aliases `simulated`/`local` and `oneclick`/`near` are accepted.
+        contractId: { type: string, format: uuid }
+        invoice: { type: string, maxLength: 200 }
+        amount:
+          type: string
+          description: Integer base units of the origin asset.
+        originAsset:
+          type: string
+          description: Provider asset identifier, e.g. `nep141:base-eth.omft.near`.
+        destinationAsset:
+          type: string
+          description: Provider asset identifier for the settlement mint.
+        recipient:
+          type: string
+          description: Must equal the authenticated wallet.
+        refundTo:
+          type: string
+          description: Refund address on the origin chain.
+        deadlineSeconds: { type: integer, minimum: 1, maximum: 604800 }
+        slippageBps: { type: integer, minimum: 0, maximum: 10000 }
+    Quote:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        contractId: { type: string, format: uuid, nullable: true }
+        mode:
+          type: string
+          enum: [mock, mainnet]
+        provider: { type: string }
+        externalId: { type: string }
+        invoice: { type: string }
+        amountIn: { type: string }
+        amountOut: { type: string, nullable: true }
+        originAsset: { type: string }
+        destinationAsset: { type: string }
+        recipient: { type: string }
+        refundTo: { type: string }
+        depositAddress: { type: string }
+        depositMemo: { type: string, nullable: true }
+        status:
+          type: string
+          enum:
+            - requested
+            - quoted
+            - source_transaction_detected
+            - routing
+            - arrived_in_client_wallet
+            - escrow_funding_pending
+            - escrow_funded
+            - failed
+            - expired
+            - refund_pending
+            - refunded
+        simulated:
+          type: boolean
+          description: True for the Devnet mock adapter. Never treat as a payment.
+        deadline: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
