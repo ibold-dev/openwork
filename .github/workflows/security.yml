@@ -16,7 +16,7 @@ jobs:
     name: Rust advisories
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # rustsec/audit-check@v2 ended with a bare failure and no annotation:
       # its bundled runner shells out to `cargo install cargo-audit`, which is
       # both slow and opaque. Install the prebuilt binary and run the same
@@ -32,7 +32,7 @@ jobs:
     name: npm advisories
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
