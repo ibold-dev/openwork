@@ -29,8 +29,7 @@ jobs:
           path: |
             ~/.cache/solana
             ~/.local/share/solana
-            ~/.cargo/bin/anchor
-            ~/.avm
+            ~/.local/bin/anchor
             ~/.cargo/registry
             ~/.cargo/git
             target
@@ -38,20 +37,25 @@ jobs:
 
       - name: Install Solana CLI
         run: |
+          # $GITHUB_PATH only affects later steps, so put the bin dir on PATH
+          # here as well. Without this, `solana --version` below exits 127.
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           if ! command -v solana >/dev/null; then
             sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
-            echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
           fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
           solana --version
 
-      - name: Install Anchor
+      - name: Install Anchor CLI
         run: |
-          if ! command -v anchor >/dev/null; then
-            cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-            avm install "${ANCHOR_VERSION}"
-            avm use "${ANCHOR_VERSION}"
-          fi
-          anchor --version
+          # Prebuilt release binary: compiling avm + anchor from source takes
+          # several minutes on every cold cache.
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL -o "$HOME/.local/bin/anchor" \
+            "https://github.com/coral-xyz/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+          chmod +x "$HOME/.local/bin/anchor"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/anchor" --version
 
       - name: Build program
         run: anchor build
@@ -91,10 +95,10 @@ jobs:
         run: node scripts/check-idl.mjs
 
       - name: Typecheck
-        run: pnpm -r --if-present typecheck
+        run: pnpm typecheck
 
       - name: Unit tests
-        run: pnpm -r --if-present test
+        run: pnpm test
 
       - name: Build
-        run: pnpm -r --if-present build
+        run: pnpm build

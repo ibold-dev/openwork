@@ -24,7 +24,7 @@ build: ## Build the program, SDK and web app
 
 typecheck: ## TypeScript and Rust type checks
 	cargo check --workspace
-	pnpm -r --if-present typecheck
+	pnpm typecheck
 
 test: test-program test-sdk test-api ## Unit tests (no validator, no network)
 	cargo fmt --all -- --check

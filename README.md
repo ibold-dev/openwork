@@ -117,8 +117,8 @@ node scripts/check-idl.mjs                  # IDL vs SDK discriminators
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-pnpm -r typecheck
-pnpm -r build
+pnpm typecheck
+pnpm build
 ```
 
 The Devnet smoke test is separate because it spends Devnet SOL and creates public
