@@ -1,0 +1,35 @@
+{
+  "cluster": "devnet",
+  "rpc": "https://api.devnet.solana.com",
+  "programId": "GT6deu8TWzjUzu5grXg4zZiAxPosK7tyoykaLtVeLjR",
+  "recordedAt": "2026-10-28T12:26:11.142Z",
+  "mint": {
+    "address": "ENmQKqTu9FaWJtmwk3nXiNT3GxX6F4k7rZe8t2bqUYT8",
+    "decimals": 6,
+    "symbol": "tUSDC",
+    "supply": "1000000000"
+  },
+  "agreement": {
+    "pda": "32uv2z7tARSew89h1g7rGRv4KQNokJnWiPdrR8ghG6WK",
+    "nonce": "1793190350318",
+    "termsHash": "098dbe8022da17a0054c32776cf3221e12b2cea8ab892e7007abf7ad001d9633",
+    "client": "5ok8FfjBgwDyfAFWYPx3yQ3Ty7s962XPthsKypNVgTup",
+    "freelancer": "2n7C96aUcA8gtPjnD47iR6hZns2EoJDx771pAwmP9XPu",
+    "vault": "5m4qZCzNaZcguoD8fpSjUYunyKex6rusjU1roJdLYMrD",
+    "vaultAuthority": "BghR732henUwj8daPgXZggszggt7gHLuh9mMgJG4ngus",
+    "milestone": "BX6Xq9Zaq5Wan19wgJn3T38ZjDCg1dfCFyJEGvS3uo4o",
+    "amount": "250000000"
+  },
+  "signatures": {
+    "fundFreelancer": "3N9azSuhArroe5qfX4pfappwxvXEytMEvYu6fqtEXgcduAk1uEQ42FiZ7KapxxRzKFxfVkt4w6RBuhcqtPSBzReZ",
+    "createMint": "5Nfwh4wSHLdJrm6iNEqb51Y99GAssMYCkGLxeyPHpvGsxFXqz9hDFNB4GoFDEKjdPaWrxwqAg9PRGtscMZt7TNMy",
+    "createTokenAccounts": "2DXSEaT4P723zXzQ2WSnMnjEGvcQic7iaSCnYBXwWSUyXkpXttTGTVnzhyvwtnCxLrFL95NQCGGm9RjLKchzk1TR",
+    "mintTokens": "5btfvDF3m828EizGB3uoG3LPLURv9UNKxxWc4Qv24tgzWKQp25AGS1NryJBrYeP8SUu8REUQRYrzoz89Y9qUNKcQ",
+    "createAgreement": "5bJq56osM2NtLExNbttc4JQz8rKvR6AJuPBepEJSRDVqY8gc2yNU2j97Hy4V8gdbwcPuaSAUtkAVfiVKksHrGPsv",
+    "createMilestone": "4kqsJkhFmto5cZ23Dbc6dD5pLTDSv9K2MsN8gXjQqWjRkyD7pBR7khwf2tccPiHP9VWubLzYCtjGJMUStSJPpPSp",
+    "acceptAgreement": "2Bd2Tz81BxpsUTsLCxdbV4edWmVK7XYLMHLGubJGver8H4LjxqUc8TLZZpCoxfWMdGR5RhUQx1xGPo2QuEExWjSd",
+    "fundMilestone": "67KCeGw431UXZj4DL8RTJfGWvvZVhs4r28nAMMsghVAntC8xME7JXR29fb99doRW4GXRGSHgwydpHm2PPTw3RgeE",
+    "submitMilestone": "4JkqG4VEhwhAVcUyyyhJqTtHN3VYbS8APiKidfqujmLQdBmJVVKuyL9YDFTEL92LZUJJg3YPMTRGV1BMTQnrLnNC",
+    "approveAndRelease": "5KnvGAWpdsWSiT7dWpryhwpE2ZXXF7GMNy4vD5JTKDVzmeSmUkuk4DkqtopxDEo72CaDuZrD6NDdAe7Jire9GDH4"
+  }
+}
