@@ -1,0 +1,9 @@
+{
+  "status": "SUCCESS",
+  "updatedAt": "2026-11-01T00:05:11.000Z",
+  "quoteResponse": {
+    "depositAddress": "0x4f3a2b1c9d8e7f6051423322110099aabbccddeeff00112233445566778899aa",
+    "amountIn": "1000000",
+    "amountOut": "998500"
+  }
+}

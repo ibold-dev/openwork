@@ -1,0 +1,38 @@
+{
+  "quote": {
+    "depositAddress": "0x4f3a2b1c9d8e7f6051423322110099aabbccddeeff00112233445566778899aa",
+    "depositMemo": null,
+    "amountIn": "1000000",
+    "amountInFormatted": "1.00",
+    "amountInUsd": "1.00",
+    "minAmountIn": "1000000",
+    "amountOut": "998500",
+    "amountOutFormatted": "0.9985",
+    "amountOutUsd": "0.9985",
+    "minAmountOut": "990000",
+    "deadline": "2026-11-01T00:10:00.000Z",
+    "timeWhenInactive": "2026-11-01T00:20:00.000Z",
+    "timeEstimate": 60,
+    "swapDetails": {
+      "amountIn": "1000000",
+      "amountInFormatted": "1.00",
+      "amountOut": "998500",
+      "amountOutFormatted": "0.9985",
+      "slippage": 100
+    }
+  },
+  "quoteRequest": {
+    "dry": true,
+    "swapType": "EXACT_INPUT",
+    "originAsset": "nep141:usdt.tether-token.near",
+    "depositType": "ORIGIN_CHAIN",
+    "destinationAsset": "solana:mainnet/spl:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "amount": "1000000",
+    "recipient": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+    "recipientType": "DESTINATION_CHAIN",
+    "refundTo": "client.near",
+    "refundType": "ORIGIN_CHAIN",
+    "slippageTolerance": 100,
+    "deadline": "2026-11-01T00:10:00.000Z"
+  }
+}
