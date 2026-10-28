@@ -1,0 +1,18 @@
+[package]
+name = "openwork-domain"
+version = "0.1.0"
+description = "Shared OpenWork domain rules: escrow states, amounts, canonical terms, PDAs"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10.9"
+solana-pubkey = { version = "3.0.0", features = ["curve25519"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+hex = "0.4.3"
