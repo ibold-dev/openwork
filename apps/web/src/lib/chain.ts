@@ -16,6 +16,7 @@ import {
   createSolanaRpc,
   createTransactionMessage,
   getBase58Decoder,
+  getCompiledTransactionMessageDecoder,
   getTransactionDecoder,
   getTransactionEncoder,
   pipe,
@@ -178,9 +179,23 @@ export async function buildWireTransaction(
     (tx) => appendTransactionMessageInstructions(instructions, tx),
   );
   const compiled = compileTransaction(message);
+  // Every required signer needs a zero-filled slot, not just the fee payer.
+  // A co-signed refund has two signers; a one-slot wire cannot be decoded or
+  // signed by the counterparty's wallet.
+  const decoded = getCompiledTransactionMessageDecoder().decode(compiled.messageBytes);
+  const signers =
+    'header' in decoded
+      ? decoded.staticAccounts.slice(0, decoded.header.numSignerAccounts)
+      : [feePayer];
+  const signatures = Object.fromEntries(
+    (signers.length > 0 ? signers : [feePayer]).map((signer) => [
+      signer,
+      new Uint8Array(64),
+    ]),
+  );
   const encoded = getTransactionEncoder().encode({
     messageBytes: compiled.messageBytes,
-    signatures: { [feePayer]: new Uint8Array(64) } as never,
+    signatures: signatures as never,
   });
   return new Uint8Array(encoded);
 }
