@@ -90,7 +90,12 @@ export function useApiSession(): ApiSessionState {
     try {
       const next = await signInWithSolana(wallet, account);
       setSession(next);
-      setContracts(await listContracts());
+      try {
+        setContracts(await listContracts());
+      } catch {
+        // The session is still valid; the listing can be retried.
+        setContracts([]);
+      }
     } catch (cause) {
       setError(
         cause instanceof ApiUnavailableError
