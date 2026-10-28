@@ -33,7 +33,7 @@ hex = "0.4.3"
 http = "1.4.0"
 openwork-aurora = { workspace = true }
 openwork-domain = { workspace = true }
-rand = "0.8.5"
+rand = "0.10.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json", "rustls-tls"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

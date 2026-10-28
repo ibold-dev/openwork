@@ -2620,7 +2620,7 @@ dependencies = [
  "http-body-util",
  "openwork-aurora",
  "openwork-domain",
- "rand 0.8.8",
+ "rand 0.10.3",
  "reqwest",
  "serde",
  "serde_json",
