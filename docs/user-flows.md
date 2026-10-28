@@ -15,9 +15,11 @@ There is no account, no email and no password. A wallet is the account.
    transaction that creates the agreement and its milestones.
 
 The wizard derives the agreement PDA from `(client, nonce)` locally, where the
-nonce is generated per draft. The same nonce and hash are sent to the indexer
-when it is available, so both agree on the same address. If the indexer is
-offline, the agreement still exists on chain.
+nonce is generated per draft. If the API is reachable and there is no session
+yet, the wizard first asks for a SIWS message signature. That is optional: it is
+not a transaction and refusing it only means the agreement is not listed in the
+index. The same nonce and hash are then sent to the indexer, so both agree on the
+same address. If the indexer is offline, the agreement still exists on chain.
 
 After creation the client gets a share link:
 
@@ -66,8 +68,8 @@ The client must already hold the settlement mint. On Devnet that is the test min
 The freelancer presses **Submit milestone**, enters a deliverable URI and an
 optional note, and signs `submit_milestone`. The browser hashes a canonical
 deliverable object (agreement, index, URI, note) and stores only the hash on
-chain. The URI and note are sent to the indexer when it is available; the chain
-proves _that_ a deliverable was committed, not _what_ it said.
+chain. The URI and note are sent to the indexer when there is a session; the
+chain proves _that_ a deliverable was committed, not _what_ it said.
 
 Submitting does not move money and does not imply approval.
 
@@ -111,11 +113,18 @@ marks the milestone `Refunded`.
 
 `/app` lists agreements the connected wallet is party to.
 
-- With the API running and a SIWS session, titles and milestones come from the
-  index and are reconciled against chain state.
-- Without the API, the page offers a chain-only view: paste or open an agreement
-  address and read its accounts directly. Nothing about funding or releasing
-  depends on the index.
+- With the API running, **Sync titles** starts a SIWS session and the page adds
+  the agreements that wallet is a party to from the index, including ones first
+  opened on another device. Indexed titles are shown when present.
+- The page still reads every agreement account from the chain. A stale index
+  cannot change a balance, a milestone state or a role; the chain wins.
+- Without a session or without the API, the page still works from chain state:
+  paste or open an agreement address and read its accounts directly. Nothing
+  about funding or releasing depends on the index.
+- With a session and an indexed agreement, each confirmed action claims its
+  signature with `POST /v1/settlements`, and a submitted deliverable also posts
+  its URI and note. Each claim stays `unverified` until the worker re-reads the
+  transaction; a failed claim never becomes a chain fact.
 
 ## 8. Cross-chain funding
 
@@ -148,6 +157,6 @@ Not verified in this build:
 | Simulation fails                       | The program error is shown and nothing is submitted     |
 | API unreachable                        | Switches to chain-only mode; value movements still work |
 | RPC unreachable                        | Error with a retry; no optimistic state change          |
-| Indexer out of sync                    | Chain account state wins; the badge shows chain-only    |
+| Indexer out of sync                    | Chain account state wins; the badge shows index in use  |
 | Link without terms fragment            | Accept is disabled and the page explains why            |
 | Wallet cannot co-sign as non-fee-payer | Explained; no false success message                     |

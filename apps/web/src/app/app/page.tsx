@@ -9,6 +9,7 @@ import { fetchAgreement, type AgreementView } from '@/lib/chain';
 import { CLUSTER, DEFAULT_MINT, KNOWN_MINTS, PROGRAM_ID } from '@/lib/config';
 import { formatAmount, relativeTime, shortenAddress } from '@/lib/format';
 import { listReceipts, listTrackedAgreements, trackAgreement } from '@/lib/storage';
+import { useApiSession } from '@/lib/use-api-session';
 import type { Address } from '@solana/kit';
 
 type Filter = 'all' | 'client' | 'freelancer';
@@ -16,12 +17,15 @@ type Filter = 'all' | 'client' | 'freelancer';
 interface LoadedAgreement {
   readonly address: string;
   readonly view: AgreementView | null;
+  /** Title from the optional index. Never treated as a chain fact. */
+  readonly title: string | null;
   readonly error: string | null;
 }
 
 export default function DashboardPage() {
   const { account, open } = useWallet();
   const viewer = account?.address ?? null;
+  const api = useApiSession();
 
   const [rows, setRows] = useState<readonly LoadedAgreement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,22 +35,46 @@ export default function DashboardPage() {
 
   const tracked = useMemo(() => (viewer ? listTrackedAgreements(viewer) : []), [viewer]);
 
+  // Agreements this wallet is a party to, according to the index. The browser
+  // cache alone misses agreements opened on another device.
+  const indexed = useMemo(
+    () =>
+      viewer
+        ? api.contracts.filter(
+            (contract) => contract.client === viewer || contract.freelancer === viewer,
+          )
+        : [],
+    [api.contracts, viewer],
+  );
+
+  const addresses = useMemo(() => {
+    const union = new Set(tracked.map((entry) => entry.address));
+    for (const contract of indexed) union.add(contract.agreementPda);
+    return Array.from(union);
+  }, [tracked, indexed]);
+
   const load = useCallback(async () => {
     if (!viewer) return;
-    if (tracked.length === 0) {
+    if (addresses.length === 0) {
       setRows([]);
       return;
     }
     setLoading(true);
     const loaded = await Promise.all(
-      tracked.map(async (entry): Promise<LoadedAgreement> => {
+      addresses.map(async (entry): Promise<LoadedAgreement> => {
         try {
-          const view = await fetchAgreement(entry.address as Address);
-          return { address: entry.address, view, error: null };
+          const view = await fetchAgreement(entry as Address);
+          return {
+            address: entry,
+            view,
+            title: api.indexedFor(entry)?.title ?? null,
+            error: null,
+          };
         } catch (cause) {
           return {
-            address: entry.address,
+            address: entry,
             view: null,
+            title: api.indexedFor(entry)?.title ?? null,
             error: cause instanceof Error ? cause.message : 'Could not read agreement',
           };
         }
@@ -54,7 +82,7 @@ export default function DashboardPage() {
     );
     setRows(loaded);
     setLoading(false);
-  }, [tracked, viewer]);
+  }, [addresses, viewer, api.indexedFor]);
 
   useEffect(() => {
     void load();
@@ -137,6 +165,29 @@ export default function DashboardPage() {
           <h1 className="h1">Agreements</h1>
         </div>
         <div className="cluster">
+          {api.session ? (
+            <span
+              className="pill pill-good"
+              title="Titles and deliverables come from the index"
+            >
+              <span className="pill-dot" />
+              Indexed
+            </span>
+          ) : api.online ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => void api.signIn()}
+              disabled={api.signingIn}
+            >
+              {api.signingIn ? 'Signing in…' : 'Sync titles'}
+            </button>
+          ) : api.probed ? (
+            <span className="pill" title="The metadata API is unreachable">
+              <span className="pill-dot" />
+              Chain-only
+            </span>
+          ) : null}
           <Link href="/app/new" className="btn">
             New agreement
           </Link>
@@ -145,6 +196,8 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {api.error ? <p className="field-error">{api.error}</p> : null}
 
       <div className="stat-row" style={{ marginBottom: '1.25rem' }}>
         <div className="stat">
@@ -220,7 +273,7 @@ export default function DashboardPage() {
                 No agreements yet
               </p>
               <p style={{ fontWeight: 500 }}>
-                {tracked.length === 0
+                {addresses.length === 0
                   ? 'Nothing tracked in this browser'
                   : 'Nothing matches this filter'}
               </p>
@@ -234,7 +287,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="contract-list">
-              {visible.map(({ address, view, error }) => (
+              {visible.map(({ address, view, title, error }) => (
                 <Link
                   key={address}
                   href={`/app/agreements/${address}`}
@@ -242,11 +295,12 @@ export default function DashboardPage() {
                 >
                   <div style={{ minWidth: 0 }}>
                     <div className="contract-title">
-                      {view
-                        ? view.account.client === viewer
-                          ? `With ${shortenAddress(view.account.freelancer, 5)}`
-                          : `From ${shortenAddress(view.account.client, 5)}`
-                        : 'Unreadable agreement'}
+                      {title ??
+                        (view
+                          ? view.account.client === viewer
+                            ? `With ${shortenAddress(view.account.freelancer, 5)}`
+                            : `From ${shortenAddress(view.account.client, 5)}`
+                          : 'Unreadable agreement')}
                     </div>
                     <div className="contract-meta">
                       <span>{shortenAddress(address, 6)}</span>
@@ -286,7 +340,8 @@ export default function DashboardPage() {
           <form className="card card-pad stack" onSubmit={submitLookup}>
             <h2 className="h3">Open by address</h2>
             <p className="help">
-              Invited to an agreement? Paste its address. Nothing is stored on a server.
+              Invited to an agreement? Paste its address. The chain is the source of
+              truth; the index only adds titles.
             </p>
             <div className="field">
               <input

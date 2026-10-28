@@ -35,11 +35,30 @@ import {
   formatTimestamp,
   shortenAddress,
 } from '@/lib/format';
+import { recordSettlement, submitMilestone } from '@/lib/api';
 import { appendReceipt, loadTerms, trackAgreement } from '@/lib/storage';
+import { useApiSession } from '@/lib/use-api-session';
 import { canonicalizeTerms, hashDeliverable, type TermsInput } from '@openwork/sdk';
 import type { Address } from '@solana/kit';
-import { getTransactionDecoder } from '@solana/kit';
+import { getCompiledTransactionMessageDecoder, getTransactionDecoder } from '@solana/kit';
 import { encodeTermsFragment, sha256Hex, type SharedTerms } from '@/lib/terms-share';
+
+/**
+ * Receipt kinds are a UI vocabulary; settlement kinds are the API's copy of the
+ * program's instruction names. Only instructions that move or freeze value are
+ * claimed, and the worker still verifies every one against the chain.
+ */
+const SETTLEMENT_KIND: Partial<
+  Record<Parameters<typeof appendReceipt>[0]['kind'], string>
+> = {
+  accept: 'accept_agreement',
+  cancel: 'cancel_draft_agreement',
+  fund: 'fund_milestone',
+  submit: 'submit_milestone',
+  release: 'approve_and_release',
+  dispute: 'raise_dispute',
+  refund: 'mutual_cancel_and_refund',
+};
 
 interface CoSignState {
   readonly wire: Uint8Array;
@@ -54,6 +73,7 @@ export default function AgreementPage() {
   ) as Address;
   const { account, wallet, open } = useWallet();
   const viewer = account?.address ?? null;
+  const api = useApiSession();
 
   const [view, setView] = useState<AgreementView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -246,10 +266,11 @@ export default function AgreementPage() {
     label: string,
     kind: Parameters<typeof appendReceipt>[0]['kind'],
     build: () => Promise<import('@solana/kit').Instruction[]>,
-  ) {
+    milestoneIndex?: number,
+  ): Promise<string | null> {
     if (!wallet || !account) {
       open();
-      return;
+      return null;
     }
     setBusy(label);
     setError(null);
@@ -264,12 +285,26 @@ export default function AgreementPage() {
         at: Date.now(),
         viewer: account.address,
       });
+      // Claim the signature against the index. The worker re-reads the
+      // transaction, so a failed claim never becomes a chain fact.
+      const indexedContract = api.indexedFor(address);
+      const settlementKind = SETTLEMENT_KIND[kind];
+      if (api.session && indexedContract && settlementKind) {
+        void recordSettlement({
+          contractId: indexedContract.id,
+          milestoneIndex,
+          signature: result.signature,
+          kind: settlementKind,
+        }).catch(() => undefined);
+      }
       setNotice(`${label} confirmed.`);
       setConfirming(null);
       setSubmitFor(null);
       await refresh();
+      return result.signature;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `${label} failed`);
+      return null;
     } finally {
       setBusy(null);
     }
@@ -312,6 +347,29 @@ export default function AgreementPage() {
     }
   }
 
+  /**
+   * Finds the milestone an unsigned refund transaction refers to. Used only to
+   * label the settlement claim; the worker still decodes the transaction.
+   */
+  function indexFromWire(wire: Uint8Array): number | null {
+    if (!view) return null;
+    try {
+      const decoded = getTransactionDecoder().decode(wire);
+      const message = getCompiledTransactionMessageDecoder().decode(decoded.messageBytes);
+      if (!('instructions' in message)) return null;
+      for (const instruction of message.instructions) {
+        for (const accountIndex of instruction.accountIndices ?? []) {
+          const key = message.staticAccounts[accountIndex];
+          const match = view.milestones.find((milestone) => milestone.address === key);
+          if (match) return match.account.index;
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
   async function finishCoSign() {
     if (!wallet || !account || !coSign) return;
     setBusy('Submitting refund');
@@ -330,6 +388,16 @@ export default function AgreementPage() {
         at: Date.now(),
         viewer: account.address,
       });
+      const indexedContract = api.indexedFor(address);
+      const milestoneIndex = indexFromWire(coSign.wire);
+      if (api.session && indexedContract && milestoneIndex !== null) {
+        void recordSettlement({
+          contractId: indexedContract.id,
+          milestoneIndex,
+          signature,
+          kind: 'mutual_cancel_and_refund',
+        }).catch(() => undefined);
+      }
       setNotice('Mutual refund submitted.');
       setCoSign(null);
       window.history.replaceState(null, '', window.location.pathname);
@@ -343,32 +411,49 @@ export default function AgreementPage() {
 
   async function submitWork(milestone: Address, index: number) {
     if (!view) return;
-    if (!deliverableUri.trim() && !deliverableNote.trim()) {
+    const uri = deliverableUri.trim();
+    const note = deliverableNote.trim();
+    if (!uri && !note) {
       setError('Add a link or a note describing the deliverable.');
       return;
     }
-    await run('Submit milestone', 'submit', async () => {
-      const hash = await hashDeliverable({
-        agreement: address,
-        milestoneIndex: index,
-        uri: deliverableUri.trim(),
-        note: deliverableNote.trim(),
-      });
-      return submitDeliverable({
-        refs: {
+    const signature = await run(
+      'Submit milestone',
+      'submit',
+      async () => {
+        const hash = await hashDeliverable({
           agreement: address,
-          client: view.account.client as Address,
-          freelancer: view.account.freelancer as Address,
-          mint: view.account.mint as Address,
-          vault: vault!,
-          vaultAuthority: await vaultAuthorityFor(view),
-        },
-        milestone,
-        deliverableHash: hash,
-      });
-    });
-    setDeliverableUri('');
-    setDeliverableNote('');
+          milestoneIndex: index,
+          uri,
+          note,
+        });
+        return submitDeliverable({
+          refs: {
+            agreement: address,
+            client: view.account.client as Address,
+            freelancer: view.account.freelancer as Address,
+            mint: view.account.mint as Address,
+            vault: vault!,
+            vaultAuthority: await vaultAuthorityFor(view),
+          },
+          milestone,
+          deliverableHash: hash,
+        });
+      },
+      index,
+    );
+    if (signature) {
+      const indexedMilestone = api
+        .indexedFor(address)
+        ?.milestones.find((item) => item.index === index);
+      if (api.session && indexedMilestone) {
+        void submitMilestone({ milestoneId: indexedMilestone.id, uri, note }).catch(
+          () => undefined,
+        );
+      }
+      setDeliverableUri('');
+      setDeliverableNote('');
+    }
   }
 
   if (loading && !view) {
@@ -410,7 +495,9 @@ export default function AgreementPage() {
     )
     .reduce((sum, milestone) => sum + milestone.account.amount, 0n);
 
-  const title = sharedTerms?.parsed.title ?? 'Untitled agreement';
+  const indexedContract = api.indexedFor(address);
+  const title =
+    sharedTerms?.parsed.title ?? indexedContract?.title ?? 'Untitled agreement';
 
   return (
     <div className="shell">
@@ -640,6 +727,9 @@ export default function AgreementPage() {
                 const state = milestone.account.state;
                 const isConfirming = confirming === milestone.address;
                 const isSubmitting = submitFor === milestone.address;
+                const indexedMilestone = api
+                  .indexedFor(address)
+                  ?.milestones.find((item) => item.index === milestone.account.index);
                 return (
                   <div className="milestone" key={milestone.address} data-state={state}>
                     <div className="milestone-node">
@@ -655,17 +745,17 @@ export default function AgreementPage() {
                           <div className="milestone-name">
                             {sharedTerms?.parsed.milestones.find(
                               (item) => item.index === milestone.account.index,
-                            )?.title ?? `Milestone ${milestone.account.index + 1}`}
+                            )?.title ??
+                              indexedMilestone?.title ??
+                              `Milestone ${milestone.account.index + 1}`}
                           </div>
-                          {sharedTerms?.parsed.milestones.find(
+                          {(sharedTerms?.parsed.milestones.find(
                             (item) => item.index === milestone.account.index,
-                          )?.description ? (
+                          )?.description ?? indexedMilestone?.description) ? (
                             <div className="milestone-note">
-                              {
-                                sharedTerms.parsed.milestones.find(
-                                  (item) => item.index === milestone.account.index,
-                                )!.description
-                              }
+                              {sharedTerms?.parsed.milestones.find(
+                                (item) => item.index === milestone.account.index,
+                              )?.description ?? indexedMilestone?.description}
                             </div>
                           ) : null}
                         </div>
@@ -730,6 +820,7 @@ export default function AgreementPage() {
                                         clientTokenAccount: clientAta,
                                       });
                                     },
+                                    milestone.account.index,
                                   )
                                 }
                                 disabled={busy !== null || !vault}
@@ -789,23 +880,28 @@ export default function AgreementPage() {
                                   type="button"
                                   className="btn btn-sm"
                                   onClick={() =>
-                                    void run('Release milestone', 'release', async () =>
-                                      releaseMilestone({
-                                        refs: {
-                                          agreement: address,
-                                          client: view.account.client as Address,
-                                          freelancer: view.account.freelancer as Address,
-                                          mint: view.account.mint as Address,
-                                          vault: vault!,
-                                          vaultAuthority: await vaultAuthorityFor(view),
-                                        },
-                                        milestone: milestone.address,
-                                        freelancerTokenAccount:
-                                          await associatedTokenAddress(
-                                            view.account.freelancer as Address,
-                                            view.account.mint as Address,
-                                          ),
-                                      }),
+                                    void run(
+                                      'Release milestone',
+                                      'release',
+                                      async () =>
+                                        releaseMilestone({
+                                          refs: {
+                                            agreement: address,
+                                            client: view.account.client as Address,
+                                            freelancer: view.account
+                                              .freelancer as Address,
+                                            mint: view.account.mint as Address,
+                                            vault: vault!,
+                                            vaultAuthority: await vaultAuthorityFor(view),
+                                          },
+                                          milestone: milestone.address,
+                                          freelancerTokenAccount:
+                                            await associatedTokenAddress(
+                                              view.account.freelancer as Address,
+                                              view.account.mint as Address,
+                                            ),
+                                        }),
+                                      milestone.account.index,
                                     )
                                   }
                                   disabled={busy !== null || !vault}
@@ -844,19 +940,23 @@ export default function AgreementPage() {
                             type="button"
                             className="btn btn-ghost btn-sm"
                             onClick={() =>
-                              void run('Raise dispute', 'dispute', async () =>
-                                raiseDispute({
-                                  refs: {
-                                    agreement: address,
-                                    client: view.account.client as Address,
-                                    freelancer: view.account.freelancer as Address,
-                                    mint: view.account.mint as Address,
-                                    vault: vault!,
-                                    vaultAuthority: await vaultAuthorityFor(view),
-                                  },
-                                  milestone: milestone.address,
-                                  signer: account!.address as Address,
-                                }),
+                              void run(
+                                'Raise dispute',
+                                'dispute',
+                                async () =>
+                                  raiseDispute({
+                                    refs: {
+                                      agreement: address,
+                                      client: view.account.client as Address,
+                                      freelancer: view.account.freelancer as Address,
+                                      mint: view.account.mint as Address,
+                                      vault: vault!,
+                                      vaultAuthority: await vaultAuthorityFor(view),
+                                    },
+                                    milestone: milestone.address,
+                                    signer: account!.address as Address,
+                                  }),
+                                milestone.account.index,
                               )
                             }
                             disabled={busy !== null}

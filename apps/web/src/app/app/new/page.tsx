@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useWallet } from '@/components/wallet-provider';
 import { createContract } from '@/lib/api';
+import { useApiSession } from '@/lib/use-api-session';
 import { buildDraftInstructions, fetchMintDecimals, sendInstructions } from '@/lib/chain';
 import { DEFAULT_MINT, DEFAULT_MINT_SYMBOL, KNOWN_MINTS } from '@/lib/config';
 import { formatAmount, parseAmount, shortenAddress } from '@/lib/format';
@@ -41,6 +42,7 @@ function emptyMilestone(index: number): MilestoneDraft {
 export default function NewAgreementPage() {
   const router = useRouter();
   const { account, wallet, open } = useWallet();
+  const api = useApiSession();
 
   const [step, setStep] = useState<Step>(0);
   const [title, setTitle] = useState('');
@@ -163,6 +165,13 @@ export default function NewAgreementPage() {
 
     setSubmitting(true);
     setError(null);
+
+    // Indexing is optional, but it needs a SIWS session. Ask once, here, so the
+    // title and milestones can be found from another device later.
+    if (api.online && !api.session) {
+      setProgress('Authorizing the index (optional)');
+      await api.signIn();
+    }
 
     const terms: TermsInput = {
       title: title.trim(),
