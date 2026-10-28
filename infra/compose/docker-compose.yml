@@ -1,0 +1,89 @@
+name: openwork
+
+# Local full-stack deployment: Postgres, API, reconciliation worker and web.
+#
+#   docker compose -f infra/compose/docker-compose.yml up --build
+#
+# Devnet only. The API is configured for the mock intents adapter; the web build
+# inlines the Devnet program and test mint.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openwork
+      POSTGRES_PASSWORD: openwork
+      POSTGRES_DB: openwork
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U openwork -d openwork']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    image: openwork-api:local
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    environment:
+      API_BIND: 0.0.0.0:8080
+      API_PUBLIC_ORIGIN: http://localhost:3000
+      API_DOMAIN: localhost
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      COOKIE_SECURE: 'false'
+      DATABASE_URL: postgres://openwork:openwork@postgres:5432/openwork
+      SOLANA_CLUSTER: devnet
+      ALLOWED_CLUSTERS: devnet,localnet
+      PROGRAM_ID: GT6deu8TWzjUzu5grXg4zZiAxPosK7tyoykaLtVeLjR
+      SOLANA_RPC_URL: https://api.devnet.solana.com
+      INTENTS_MODE: mock
+      RUST_LOG: info
+    ports:
+      - '8080:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: openwork-api:local
+    command: ['worker']
+    environment:
+      DATABASE_URL: postgres://openwork:openwork@postgres:5432/openwork
+      SOLANA_CLUSTER: devnet
+      PROGRAM_ID: GT6deu8TWzjUzu5grXg4zZiAxPosK7tyoykaLtVeLjR
+      SOLANA_RPC_URL: https://api.devnet.solana.com
+      INTENTS_MODE: mock
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+  web:
+    image: openwork-web:local
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        OPENWORK_API_URL: http://api:8080
+        NEXT_PUBLIC_SOLANA_CLUSTER: devnet
+        NEXT_PUBLIC_DEFAULT_MINT: ENmQKqTu9FaWJtmwk3nXiNT3GxX6F4k7rZe8t2bqUYT8
+        NEXT_PUBLIC_DEFAULT_MINT_SYMBOL: tUSDC
+    environment:
+      OPENWORK_API_URL: http://api:8080
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  SOLANA_VERSION: 2.3.11
+  ANCHOR_VERSION: 1.1.2
+
+jobs:
+  program:
+    name: Program and API (Rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Solana and Anchor
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/solana
+            ~/.local/share/solana
+            ~/.cargo/bin/anchor
+            ~/.avm
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: solana-${{ env.SOLANA_VERSION }}-anchor-${{ env.ANCHOR_VERSION }}-${{ hashFiles('**/Cargo.lock', 'programs/**', 'crates/**', 'apps/api/**') }}
+
+      - name: Install Solana CLI
+        run: |
+          if ! command -v solana >/dev/null; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
+            echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          fi
+          solana --version
+
+      - name: Install Anchor
+        run: |
+          if ! command -v anchor >/dev/null; then
+            cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+            avm install "${ANCHOR_VERSION}"
+            avm use "${ANCHOR_VERSION}"
+          fi
+          anchor --version
+
+      - name: Build program
+        run: anchor build
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Program tests (LiteSVM)
+        run: cargo test -p openwork-escrow
+
+      - name: API tests (in-memory store)
+        run: cargo test -p openwork-api
+
+  web:
+    name: Web and SDK (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: IDL and discriminator drift
+        run: node scripts/check-idl.mjs
+
+      - name: Typecheck
+        run: pnpm -r --if-present typecheck
+
+      - name: Unit tests
+        run: pnpm -r --if-present test
+
+      - name: Build
+        run: pnpm -r --if-present build

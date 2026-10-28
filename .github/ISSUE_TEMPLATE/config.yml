@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/openwork-labs/openwork/security/advisories/new
+    about: Report suspected loss-of-funds or authorization bugs privately.
+  - name: Solana Devnet status
+    url: https://status.solana.com
+    about: Check the cluster before filing an RPC or confirmation issue.

@@ -1,0 +1,12 @@
+# Default owners for everything in the repository.
+*       @openwork-labs/maintainers
+
+# Funds-moving code needs an explicit reviewer.
+/programs/openwork-escrow/   @openwork-labs/program-reviewers
+/packages/sdk/src/           @openwork-labs/program-reviewers
+/apps/web/src/lib/chain.ts   @openwork-labs/program-reviewers
+
+# Deployments and CI.
+/.github/                    @openwork-labs/maintainers
+/infra/                      @openwork-labs/maintainers
+/docs/deployments.md         @openwork-labs/maintainers
