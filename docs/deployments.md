@@ -106,6 +106,13 @@ the reconciliation worker:
    and populated `contracts.chain_state = completed`,
    `chain_settled_count = 1`, `chain_released_amount = 250000000`.
 
+The browser path was exercised too: the Next.js server was started with
+`OPENWORK_API_URL=http://127.0.0.1:8088`, and a full SIWS login, `/v1/me` and
+`/v1/contracts` call went through `/api/proxy/*`. The session cookie was set on
+the web origin (`localhost`), not the API origin. With the API stopped, the same
+proxy returned `502` and `{"code":"api_unavailable"}`, so the UI falls back to
+chain-only instead of showing stale data.
+
 That run also exposed and fixed a deserialization bug: `TransactionMeta` was
 missing `#[serde(rename_all = "camelCase")]`, so `logMessages` never arrived and
 every claim failed as `no_events_for_contract`. A regression test now decodes a

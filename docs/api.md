@@ -131,6 +131,16 @@ The real 1Click adapter is compiled behind a Mainnet-only configuration. There i
 no runtime fallback, because a fallback would hand a Mainnet user a fake deposit
 address.
 
+## Browser access
+
+The web app does not call the API cross-origin. It calls `/api/proxy/*` on its
+own origin, and a Next.js route handler forwards the request to
+`OPENWORK_API_URL` (read at request time). The handler forwards the session
+cookie, `Origin`, `x-openwork-csrf` and `Idempotency-Key`, preserves every
+`Set-Cookie` header, and answers `502` with a JSON error when the API is down.
+That is why the session cookie stays first-party and why the browser never needs
+to know the API's hostname.
+
 ## Rate limits
 
 A per-process token bucket applies to all routes. Exceeding it returns `429`.

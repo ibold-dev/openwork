@@ -85,8 +85,10 @@ pnpm --filter @openwork/web dev
 - Build command: `pnpm --filter @openwork/web build`
 - Output: Next.js (standalone is enabled; use the platform's Next preset)
 - Environment: every variable in `apps/web/.env.example`
-- `OPENWORK_API_URL` must point at the API; the Next server proxies
-  `/api/proxy/*` to it so the session cookie stays first-party.
+- `OPENWORK_API_URL` must point at the API. The Next route handler at
+  `/api/proxy/*` reads it at request time and proxies to it, so the session
+  cookie stays first-party. It is a server-only variable; changing it does not
+  require a rebuild.
 
 Public variables are inlined at **build** time. Changing
 `NEXT_PUBLIC_SOLANA_RPC_URL` requires a rebuild.

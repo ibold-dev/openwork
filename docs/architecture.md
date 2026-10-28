@@ -142,6 +142,13 @@ the terms; this is not a confidentiality guarantee.
 `src/lib/api.ts` probes `/api/proxy/health/live`. If the API is absent, the app
 shows a chain-only badge and skips indexing. Every value movement still works.
 
+The proxy is `src/app/api/proxy/[...path]/route.ts`, a Node route handler that
+reads `OPENWORK_API_URL` at request time. It forwards only the headers that
+matter (`cookie`, `origin`, `x-openwork-csrf`, `Idempotency-Key`, content type),
+preserves every `Set-Cookie` header and returns `502` with a JSON error when the
+API is unreachable. Keeping the proxy first-party is what makes the HttpOnly
+session cookie work without exposing the API origin to the browser.
+
 ## 4. API
 
 Location: `apps/api` · Axum 0.8 · SQLx · Postgres 16

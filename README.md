@@ -23,7 +23,7 @@ agreement with any Solana wallet.
 | Escrow program      | Deployed to Devnet; 16 LiteSVM tests                                                      |
 | SDK lifecycle       | 13 tests against a local validator with real SPL tokens                                   |
 | Devnet smoke        | Real create → accept → fund → submit → release, signatures committed                      |
-| Web app             | Builds and runs; 8 routes; wallet-standard signing, no adapter packages                   |
+| Web app             | Builds and runs; 9 routes; wallet-standard signing, no adapter packages                   |
 | Metadata API        | Unit, HTTP and reconciliation tests green; OpenAPI 3.0; needs Postgres to run             |
 | Cross-chain funding | **Devnet simulation only** — the real 1Click adapter is mainnet-gated and unverified here |
 | Hosted public URL   | Not provided; deploy your own with the instructions below                                 |
