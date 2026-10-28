@@ -28,7 +28,7 @@ borsh = "1.6.1"
 bs58 = "0.5.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 dotenvy = "0.15.7"
-ed25519-dalek = "2.2.0"
+ed25519-dalek = "3.0.0"
 hex = "0.4.3"
 http = "1.4.0"
 openwork-aurora = { workspace = true }
