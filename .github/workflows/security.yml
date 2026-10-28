@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  checks: write
 
 jobs:
   rust-advisories:
@@ -18,12 +17,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
+      # rustsec/audit-check@v2 ended with a bare failure and no annotation:
+      # its bundled runner shells out to `cargo install cargo-audit`, which is
+      # both slow and opaque. Install the prebuilt binary and run the same
+      # command the local gate uses, so .cargo/audit.toml applies and any
+      # failure prints an actionable report.
+      - uses: taiki-e/install-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Mirrors .cargo/audit.toml. `rsa` is an optional sqlx-mysql
-          # dependency; the MySQL driver is not compiled here.
-          ignore: RUSTSEC-2023-0071
+          tool: cargo-audit
+      - name: Audit dependencies
+        run: cargo audit
 
   npm-advisories:
     name: npm advisories
