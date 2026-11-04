@@ -25,7 +25,7 @@
     "test:devnet": "vitest run tests/devnet-smoke.integration.test.ts"
   },
   "dependencies": {
-    "@solana/kit": "^8.5.0"
+    "@solana/kit": "^8.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
