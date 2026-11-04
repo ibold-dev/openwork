@@ -28,7 +28,7 @@
     "@solana/kit": "^8.5.0"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
+    "@types/node": "^26.6.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
