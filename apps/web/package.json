@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@openwork/sdk": "workspace:*",
-    "@solana/kit": "^8.5.0",
+    "@solana/kit": "^8.6.0",
     "geist": "^1.5.1",
     "motion": "^12.23.24",
     "next": "16.4.3",
